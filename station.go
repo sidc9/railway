@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"math/rand"
 	"time"
@@ -9,6 +10,10 @@ import (
 type Station struct {
 	Name      string
 	Platforms map[lineID]*Platform
+}
+
+func (s *Station) String() string {
+	return fmt.Sprintf(s.Name)
 }
 
 func NewStation(name string) *Station {

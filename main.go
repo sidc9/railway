@@ -73,11 +73,13 @@ func main() {
 
 	rand.Seed(time.Now().UnixNano())
 
-	if up {
+	if !down {
+		fmt.Printf("running service: %s --> %s\n", stns[0].String(), stns[len(stns)-1])
 		stns[0].StartService(line, trains)
 	}
 
-	if down {
+	if !up {
+		fmt.Printf("running service: %s --> %s\n", stns[len(stns)-1], stns[0])
 		stns[len(stns)-1].StartService(line, trains)
 	}
 
