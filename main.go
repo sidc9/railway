@@ -1,11 +1,13 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
+	"sync"
 	"time"
 )
 
@@ -43,7 +45,7 @@ func main() {
 	var up, down bool
 	var trains int
 
-	flag.StringVar(&config, "d", "", "data filename (json)")
+	flag.StringVar(&config, "d", "data.json", "data filename")
 	flag.IntVar(&trains, "n", 1, "number of trains to run")
 	flag.BoolVar(&up, "up", false, "run trains only in UP direction")
 	flag.BoolVar(&down, "down", false, "run trains only in DOWN direction")
@@ -67,8 +69,11 @@ func main() {
 
 	Connect(line, stns...)
 
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*15)
+	var wg sync.WaitGroup
+
 	for _, stn := range stns {
-		stn.Run()
+		stn.Run(ctx, &wg)
 	}
 
 	rand.Seed(time.Now().UnixNano())
@@ -83,5 +88,6 @@ func main() {
 		stns[len(stns)-1].StartService(line, trains)
 	}
 
-	time.Sleep(time.Second * 20)
+	wg.Wait()
+	cancel()
 }

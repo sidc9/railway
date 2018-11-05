@@ -1,9 +1,11 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"math/rand"
+	"sync"
 	"time"
 )
 
@@ -56,19 +58,30 @@ func NewPlatform() *Platform {
 	}
 }
 
-func (s *Station) Run() {
+func (s *Station) Run(ctx context.Context, wg *sync.WaitGroup) {
 	for _, pf := range s.Platforms {
 		processTrains := func(k *Track) {
-			for tr := range k.In {
-				arrived := tr.Passengers
-				tr.Passengers = rand.Intn(100)
+			wg.Add(1)
+			defer wg.Done()
+			for {
+				select {
+				case <-ctx.Done():
+					//fmt.Printf("station %s is closing\n", s.Name)
+					return
+				case tr, ok := <-k.In:
+					if !ok {
+						return
+					}
+					arrived := tr.Passengers
+					tr.Passengers = rand.Intn(100)
 
-				log.Printf("%s train %s arrived at %s with passengers: %d -> %d\n", k.dir, tr.Name, s.Name, arrived, tr.Passengers)
+					log.Printf("%s train %s arrived at %s with passengers: %d -> %d\n", k.dir, tr.Name, s.Name, arrived, tr.Passengers)
 
-				time.Sleep(time.Second * 2)
+					time.Sleep(time.Second * 1)
 
-				if k.Out != nil {
-					k.Out <- tr
+					if k.Out != nil {
+						k.Out <- tr
+					}
 				}
 			}
 		}
@@ -77,7 +90,6 @@ func (s *Station) Run() {
 		d := pf.Down
 		go processTrains(u)
 		go processTrains(d)
-
 	}
 }
 
