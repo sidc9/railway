@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"math/rand"
 	"sync"
 	"time"
@@ -73,8 +74,11 @@ func main() {
 	var wg sync.WaitGroup
 
 	for _, stn := range stns {
+		go monitor(stn)
 		stn.Run(ctx, &wg)
 	}
+
+	// TODO: add station monitor
 
 	rand.Seed(time.Now().UnixNano())
 
@@ -90,4 +94,21 @@ func main() {
 
 	wg.Wait()
 	cancel()
+}
+
+func monitor(stn *Station) {
+	stn.AddProbe(EventTrainArrived)
+	stn.AddProbe(EventTrainDeparted)
+
+	for ev := range stn.Events {
+		//log.Printf("%s train %s arrived at %s with passengers: %d -> %d\n", k.dir, tr.Name, s.Name, arrived, tr.Passengers)
+		switch ev.Type {
+		case EventTrainArrived:
+			tr := ev.Payload.(*Train)
+			log.Printf("train %s arrived at %s\n", tr.Name, stn.Name)
+		case EventTrainDeparted:
+			tr := ev.Payload.(*Train)
+			log.Printf("train %s departed %s\n", tr.Name, stn.Name)
+		}
+	}
 }

@@ -9,9 +9,27 @@ import (
 	"time"
 )
 
+type EventType int
+
+const (
+	_ EventType = iota
+	EventServiceStart
+	EventTrainArrived
+	EventTrainDeparted
+)
+
+type Event struct {
+	Type    EventType
+	Msg     string
+	Payload interface{}
+}
+
 type Station struct {
 	Name      string
 	Platforms map[lineID]*Platform
+	Events    chan Event
+
+	probes map[EventType]bool
 }
 
 func (s *Station) String() string {
@@ -19,7 +37,16 @@ func (s *Station) String() string {
 }
 
 func NewStation(name string) *Station {
-	return &Station{name, make(map[lineID]*Platform)}
+	return &Station{
+		Name:      name,
+		Platforms: make(map[lineID]*Platform),
+		Events:    make(chan Event, 1),
+		probes:    make(map[EventType]bool),
+	}
+}
+
+func (s *Station) AddProbe(event EventType) {
+	s.probes[event] = true
 }
 
 func (s *Station) AddLine(id lineID) {
@@ -72,15 +99,18 @@ func (s *Station) Run(ctx context.Context, wg *sync.WaitGroup) {
 					if !ok {
 						return
 					}
-					arrived := tr.Passengers
+					//arrived := tr.Passengers
 					tr.Passengers = rand.Intn(100)
 
-					log.Printf("%s train %s arrived at %s with passengers: %d -> %d\n", k.dir, tr.Name, s.Name, arrived, tr.Passengers)
+					//log.Printf("%s train %s arrived at %s with passengers: %d -> %d\n", k.dir, tr.Name, s.Name, arrived, tr.Passengers)
+					if _, ok := s.probes[EventTrainArrived]; ok {
+						s.Events <- Event{Type: EventTrainArrived, Payload: tr}
+					}
 
 					time.Sleep(time.Second * 1)
 
 					if k.Out != nil {
-						k.Out <- tr
+						s.depart(k, tr)
 					}
 				}
 			}
@@ -91,6 +121,16 @@ func (s *Station) Run(ctx context.Context, wg *sync.WaitGroup) {
 		go processTrains(u)
 		go processTrains(d)
 	}
+}
+
+// depart emits the train departed event and simulates travel time
+// before writing the train to the IN channel of the next station.
+func (s *Station) depart(k *Track, tr *Train) {
+	if _, ok := s.probes[EventTrainDeparted]; ok {
+		s.Events <- Event{Type: EventTrainDeparted, Payload: tr}
+	}
+	time.Sleep(time.Second * 2) // travel time
+	k.Out <- tr
 }
 
 func Connect(line lineID, stations ...*Station) {
